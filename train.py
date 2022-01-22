@@ -33,19 +33,20 @@ LOSS_NAMES.append('BCEWithLogitsLoss')
 """
 
 指定参数：
---dataset dsb2018_96 
+--dataset 
 --arch NestedUNet
 
 """
-
+# 神经网络训练超参数参数设置
 def parse_args():
     parser = argparse.ArgumentParser()
-
     parser.add_argument('--name', default=None,
                         help='model name: (default: arch+timestamp)')
-    parser.add_argument('--epochs', default=100, type=int, metavar='N',
+    # 神经网络迭代次数
+    parser.add_argument('--epochs', default=1000, type=int, metavar='N',
                         help='number of total epochs to run')
-    parser.add_argument('-b', '--batch_size', default=5, type=int, #8
+    # Batch_size
+    parser.add_argument('-b', '--batch_size', default=5, type=int,
                         metavar='N', help='mini-batch size (default: 16)')
     
     # model
@@ -54,43 +55,45 @@ def parse_args():
                         help='model architecture: ' +
                         ' | '.join(ARCH_NAMES) +
                         ' (default: NestedUNet)')
+    # 在训练时不剪枝
     parser.add_argument('--deep_supervision', default=False, type=str2bool)
+    # 输入通道数
     parser.add_argument('--input_channels', default=3, type=int,
                         help='input channels')
+    # 分割类别数
     parser.add_argument('--num_classes', default=1, type=int,
                         help='number of classes')
+    # 训练图片的宽
     parser.add_argument('--input_w', default=256, type=int,
                         help='image width')
+    # 训练图片的高
     parser.add_argument('--input_h', default=256, type=int,
                         help='image height')
     
-    # loss
+    # 设置损失函数
     parser.add_argument('--loss', default='BCEDiceLoss',
                         choices=LOSS_NAMES,
                         help='loss: ' +
                         ' | '.join(LOSS_NAMES) +
                         ' (default: BCEDiceLoss)')
     
-    # dataset
-    # parser.add_argument('--dataset', default='dsb2018_96',
-    #                     help='dataset name')
-    # parser.add_argument('--img_ext', default='.png',
-    #                     help='image file extension')
-    # parser.add_argument('--mask_ext', default='.png',
-    #                     help='mask file extension')
+    # 训练数据集
     parser.add_argument('--dataset', default='data/train',
                         help='dataset name')
+    # 原图像格式
     parser.add_argument('--img_ext', default='.jpg',
                         help='image file extension')
+    # masks图像格式
     parser.add_argument('--mask_ext', default='.png',
                         help='mask file extension')
 
-    # optimizer
+    # 设置神经网络优化器optimizer为Adam,效果在道路裂痕分割中收敛效果比SGD好
     parser.add_argument('--optimizer', default='Adam',
                         choices=['Adam', 'SGD'],
                         help='loss: ' +
                         ' | '.join(['Adam', 'SGD']) +
                         ' (default: Adam)')
+    # 自适应的学习率的调整策略，起始为0.001
     parser.add_argument('--lr', '--learning_rate', default=1e-3, type=float,
                         metavar='LR', help='initial learning rate')
     parser.add_argument('--momentum', default=0.9, type=float,
@@ -101,6 +104,7 @@ def parse_args():
                         help='nesterov')
 
     # scheduler
+    # 余弦学习率衰减
     parser.add_argument('--scheduler', default='CosineAnnealingLR',
                         choices=['CosineAnnealingLR', 'ReduceLROnPlateau', 'MultiStepLR', 'ConstantLR'])
     parser.add_argument('--min_lr', default=1e-5, type=float,
@@ -109,6 +113,7 @@ def parse_args():
     parser.add_argument('--patience', default=2, type=int)
     parser.add_argument('--milestones', default='1,2', type=str)
     parser.add_argument('--gamma', default=2/3, type=float)
+    # 是否提前停止，防止过拟合
     parser.add_argument('--early_stopping', default=-1, type=int,
                         metavar='N', help='early stopping (default: -1)')
     
@@ -118,7 +123,7 @@ def parse_args():
 
     return config
 
-
+# 训练函数
 def train(config, train_loader, model, criterion, optimizer):
     avg_meters = {'loss': AverageMeter(),
                   'iou': AverageMeter()}
@@ -134,18 +139,19 @@ def train(config, train_loader, model, criterion, optimizer):
 
         # compute output
         if config['deep_supervision']:
-            outputs = model(input)
+            outputs = model(input) # 神经网络输出
             loss = 0
             for output in outputs:
-                loss += criterion(output, target)
+                loss += criterion(output, target) # 计算损失函数值
             loss /= len(outputs)
-            iou = iou_score(outputs[-1], target)
+            iou = iou_score(outputs[-1], target) # 计算交并比
         else:
             output = model(input)
-            loss = criterion(output, target)
-            iou = iou_score(output, target)
+            loss = criterion(output, target) # 计算损失函数值
+            iou = iou_score(output, target) # 计算交并比
 
         # compute gradient and do optimizing step
+        # 进行反向传播，更新神经网络参数
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -228,7 +234,7 @@ def main():
 
     # define loss function (criterion)
     if config['loss'] == 'BCEWithLogitsLoss':
-        criterion = nn.BCEWithLogitsLoss().cuda()#WithLogits 就是先将输出结果经过sigmoid再交叉熵
+        criterion = nn.BCEWithLogitsLoss().cuda()# WithLogits 就是先将输出结果经过sigmoid再交叉熵
     else:
         criterion = losses.__dict__[config['loss']]().cuda()
 
@@ -270,18 +276,20 @@ def main():
     img_ids = glob(os.path.join('inputs', config['dataset'], 'images', '*' + config['img_ext']))
     img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
 
+    # 切分训练集和验证集
     train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
-    #数据增强：
+
+    # 数据增强：
     train_transform = Compose([
-        albu.RandomRotate90(),
-        transforms.Flip(),
+        albu.RandomRotate90(),# 随机旋转
+        transforms.Flip(),# 随机翻转
         OneOf([
-            transforms.HueSaturationValue(),
-            transforms.RandomBrightness(),
-            transforms.RandomContrast(),
-        ], p=1),#按照归一化的概率选择执行哪一个
-        albu.Resize(config['input_h'], config['input_w']),
-        transforms.Normalize(),
+            transforms.HueSaturationValue(),# 色调饱和度值
+            transforms.RandomBrightness(),# 随机亮度
+            transforms.RandomContrast(),# 随机对比度
+        ], p=1), # 按照归一化的概率选择执行哪一个
+        albu.Resize(config['input_h'], config['input_w']),# 调整大小
+        transforms.Normalize(),# 归一化
     ])
 
     val_transform = Compose([
@@ -311,7 +319,7 @@ def main():
         batch_size=config['batch_size'],
         shuffle=True,
         num_workers=config['num_workers'],
-        drop_last=True)#不能整除的batch是否就不要了
+        drop_last=True) # 不能整除的batch是否就不要了
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
         batch_size=config['batch_size'],
@@ -319,6 +327,7 @@ def main():
         num_workers=config['num_workers'],
         drop_last=False)
 
+    # 记录训练日志
     log = OrderedDict([
         ('epoch', []),
         ('lr', []),
@@ -358,6 +367,7 @@ def main():
 
         trigger += 1
 
+        # 模型保存策略，这里选择了最大交并比的模型，也可以选择最小loss
         if val_log['iou'] > best_iou:
             torch.save(model.state_dict(), 'models/%s/model.pth' %
                        config['name'])

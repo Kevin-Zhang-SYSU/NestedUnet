@@ -8,6 +8,7 @@ import torch
 import torch.backends.cudnn as cudnn
 import albumentations as albu
 import yaml
+from skimage import transform
 import time
 from PIL import Image
 from albumentations.augmentations import transforms
@@ -19,20 +20,18 @@ import archs
 from dataset import Dataset
 from metrics import iou_score
 from utils import AverageMeter
-"""
-需要指定参数：--name dsb2018_96_NestedUNet_woDS
-"""
 
+# 定义阈值
 threshold=0.5
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
+    # 模型选择
     parser.add_argument('--name', default="data/train_NestedUnet_woDS",
                         help='model name')
 
     args = parser.parse_args()
-
     return args
 
 
@@ -61,8 +60,8 @@ def main():
 
     # Data loading code
     # 测试集文件地址
-    img_ids = glob(os.path.join('inputs', config['dataset'], 'images', '*' + config['img_ext']))
-    #img_ids = glob(os.path.join('inputs/data/test/images',  '*' + 'jpg'))
+    #img_ids = glob(os.path.join('inputs', config['dataset'], 'images', '*' + config['img_ext']))
+    img_ids = glob(os.path.join('inputs/data/test/images',  '*' + 'jpg'))
     # 将每张图像的名字取出
     val_img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
 
@@ -76,10 +75,11 @@ def main():
         transforms.Normalize(),
     ])
 
+    # 测试参数
     val_dataset = Dataset(
         img_ids=val_img_ids,
-        img_dir=os.path.join('inputs', config['dataset'], 'images'),
-        mask_dir=os.path.join('inputs', config['dataset'], 'masks'),
+        img_dir=os.path.join('inputs/data/test/images'),
+        mask_dir=os.path.join('inputs/data/test/masks'),
         img_ext=config['img_ext'],
         mask_ext=config['mask_ext'],
         num_classes=config['num_classes'],
@@ -123,6 +123,7 @@ def main():
                     # 将输出图片输出到文件夹
                     cv2.imwrite(os.path.join('outputs', config['name'], str(c), meta['img_id'][i] + '.jpg'),
                                 (output[i, c] * 255).astype('uint8'))
+
 
     print('IoU: %.4f' % avg_meter.avg)
 

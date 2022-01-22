@@ -3,6 +3,7 @@ from torch import nn
 
 __all__ = ['UNet', 'NestedUNet']
 
+# Unet++,Unet网络结构
 
 class VGGBlock(nn.Module):
     def __init__(self, in_channels, middle_channels, out_channels):

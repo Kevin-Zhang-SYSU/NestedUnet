@@ -9,7 +9,7 @@ except ImportError:
 
 __all__ = ['BCEDiceLoss', 'LovaszHingeLoss']
 
-
+# 基于二值交叉熵损失函数的自定义损失函数
 class BCEDiceLoss(nn.Module):
     def __init__(self):
         super().__init__()

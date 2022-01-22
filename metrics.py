@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-
+# 评估模型检测效果函数
 def iou_score(output, target):
     smooth = 1e-5
 
