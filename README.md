@@ -1,6 +1,8 @@
 # NestedUnet
 Road crack detection project based on NestedUnet model
 
+基于Unet++的道路裂痕检测方法
+
 ## 环境配置
 * Python 3.7
 * Pytorch >= 1.7.0
